@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>學力檢測考古題強化練習系統</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app">
+        <!-- 登入頁面 -->
+        <div id="login-page" class="page active">
+            <div class="login-container">
+                <header>
+                    <h1 class="premium-title">考古題強化練習</h1>
+                    <p class="subtitle">讓學習更精準，進步更輕鬆</p>
+                </header>
+                <div class="login-card glass">
+                    <h2>學生登入</h2>
+                    <p>請輸入您的號碼開始練習</p>
+                    <div class="input-group">
+                        <input type="number" id="student-number" placeholder="您的號碼 (例: 2, 4, 9...)" min="1">
+                        <button id="login-btn" class="btn-primary">進入系統</button>
+                    </div>
+                    <p id="login-error" class="error-msg"></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 儀表板頁面 -->
+        <div id="dashboard-page" class="page">
+            <nav class="navbar glass">
+                <div class="nav-content">
+                    <span class="brand">練習系統</span>
+                    <div class="user-info">
+                        <span id="user-name"></span>
+                        <button id="logout-btn" class="btn-outline">登出</button>
+                    </div>
+                </div>
+            </nav>
+            <main class="container">
+                <header class="dashboard-header">
+                    <h1>您的弱點強化清單</h1>
+                    <p>我們根據分析結果，為您準備了以下知識點的專屬練習</p>
+                </header>
+                <div id="nodes-grid" class="nodes-grid">
+                    <!-- 節點卡片將由 JS 生成 -->
+                </div>
+            </main>
+        </div>
+
+        <!-- 練習頁面 -->
+        <div id="practice-page" class="page">
+            <nav class="navbar glass">
+                <div class="nav-content">
+                    <button id="back-btn" class="btn-text">← 返回列表</button>
+                    <span id="current-node-title" class="node-title-nav"></span>
+                    <div class="progress-bar-container">
+                        <div id="progress-bar" class="progress-bar"></div>
+                    </div>
+                </div>
+            </nav>
+            <main class="container">
+                <div id="question-container" class="question-card glass">
+                    <div class="question-header">
+                        <span id="question-number" class="badge">第 1 題</span>
+                    </div>
+                    <div class="question-body">
+                        <p id="question-text" class="question-text"></p>
+                        <div id="options-container" class="options-container">
+                            <!-- 選項按鈕將由 JS 生成 -->
+                        </div>
+                    </div>
+                    <div id="feedback-area" class="feedback-area hidden">
+                        <div id="result-banner" class="result-banner"></div>
+                        <div class="ans-item">
+                            <strong>解題思路：</strong>
+                            <p id="explanation-text"></p>
+                        </div>
+                    </div>
+                    <div class="footer-btns">
+                        <button id="prev-btn" class="btn-outline">上一題</button>
+                        <button id="next-btn" class="btn-primary">下一題</button>
+                        <button id="finish-btn" class="btn-primary hidden">完成練習</button>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script src="data.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,135 @@
+:root {
+    --primary: #007AFF;
+    --primary-hover: #0062CC;
+    --secondary: #5AC8FA;
+    --bg-color: #FBFBFD;
+    --card-bg: rgba(255, 255, 255, 0.8);
+    --text-main: #1D1D1F;
+    --text-muted: #86868B;
+    --error: #FF3B30;
+    --success: #34C759;
+    --border: #E5E5E7;
+    --glass-blur: blur(12px);
+    --radius: 12px;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro TC", "Noto Sans TC", "Segoe UI", Roboto, sans-serif;
+}
+
+body {
+    background-color: var(--bg-color);
+    color: var(--text-main);
+    line-height: 1.5;
+}
+
+.page {
+    display: none;
+    min-height: 100vh;
+    animation: fadeIn 0.4s ease-out;
+}
+
+.page.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.container {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.glass {
+    background: var(--card-bg);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+/* 按鈕樣式 */
+button {
+    cursor: pointer;
+    border: none;
+    padding: 10px 20px;
+    border-radius: var(--radius);
+    font-size: 1rem;
+    transition: all 0.2s ease;
+}
+
+.btn-primary { background-color: var(--primary); color: white; font-weight: 600; }
+.btn-primary:hover { background-color: var(--primary-hover); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3); }
+
+.btn-outline { background: transparent; border: 1.5px solid var(--primary); color: var(--primary); font-weight: 600; }
+.btn-outline:hover { background: rgba(0, 122, 255, 0.05); }
+
+.btn-text { background: transparent; color: var(--text-muted); }
+
+/* 登入頁 */
+.login-container { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
+.premium-title { font-size: 2.5rem; font-weight: 800; margin-bottom: 8px; background: linear-gradient(135deg, #007AFF 0%, #5AC8FA 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.subtitle { font-size: 1.1rem; color: var(--text-muted); margin-bottom: 40px; }
+.login-card { width: 100%; max-width: 400px; padding: 40px; border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.05); text-align: center; }
+.input-group { display: flex; flex-direction: column; gap: 16px; margin-top: 24px; }
+input { width: 100%; padding: 14px; border-radius: var(--radius); border: 1.5px solid var(--border); font-size: 1.1rem; outline: none; transition: border-color 0.2s; }
+input:focus { border-color: var(--primary); }
+.error-msg { color: var(--error); font-size: 0.9rem; margin-top: 12px; }
+
+/* 導航欄 */
+.navbar { position: sticky; top: 0; z-index: 100; padding: 10px 0; }
+.nav-content { max-width: 1000px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; padding: 0 20px; }
+.brand { font-weight: 800; font-size: 1.2rem; color: var(--primary); }
+.node-title-nav { font-weight: 600; font-size: 1rem; }
+
+/* 儀表板 */
+.dashboard-header { margin: 40px 0 30px; }
+.nodes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
+.node-card { padding: 24px; border-radius: 20px; background: white; box-shadow: 0 4px 10px rgba(0,0,0,0.02); border: 1px solid var(--border); transition: all 0.3s ease; display: flex; flex-direction: column; justify-content: space-between;}
+.node-card:hover { transform: translateY(-5px); box-shadow: 0 12px 30px rgba(0,0,0,0.08); }
+.node-code { font-size: 0.8rem; font-weight: 700; color: var(--primary); text-transform: uppercase; margin-bottom: 8px; display: block; }
+.node-name { font-size: 1.1rem; font-weight: 600; margin-bottom: 12px; }
+.status-badge { font-size: 0.8rem; padding: 4px 8px; border-radius: 4px; background: #F2F2F7; color: var(--text-muted); }
+.status-badge.completed { background: rgba(52, 199, 89, 0.1); color: var(--success); }
+
+/* 練習頁面 */
+.question-card { margin-top: 20px; padding: 40px; border-radius: 24px; box-shadow: 0 20px 40px rgba(0,0,0,0.05); }
+.question-number { margin-bottom: 24px; }
+.badge { background-color: #F2F2F7; padding: 6px 12px; border-radius: 6px; font-size: 0.85rem; font-weight: 600; }
+.question-text { font-size: 1.3rem; font-weight: 600; margin-bottom: 30px; }
+
+/* 選擇題樣式 */
+.options-container { display: grid; gap: 12px; margin-bottom: 30px; }
+.option-btn { width: 100%; text-align: left; padding: 16px 20px; background: #F8F9FA; border: 1px solid var(--border); border-radius: 12px; font-size: 1rem; color: var(--text-main); position: relative; }
+.option-btn:hover:not(:disabled) { background: #F2F2F7; border-color: var(--primary); }
+.option-btn:disabled { cursor: default; }
+
+.option-btn.correct { background: #E8F5E9; border-color: var(--success); color: var(--success); font-weight: 700; }
+.option-btn.wrong { background: #FFEBEE; border-color: var(--error); color: var(--error); }
+
+.feedback-area { margin-top: 30px; padding-top: 20px; border-top: 1px solid var(--border); animation: slideIn 0.3s ease; }
+@keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+.result-banner { font-size: 1.2rem; font-weight: 700; margin-bottom: 15px; }
+.result-banner.success { color: var(--success); }
+.result-banner.error { color: var(--error); }
+
+.hidden { display: none; }
+.ans-item strong { color: var(--primary); display: block; margin-bottom: 5px; }
+
+.footer-btns { display: flex; justify-content: space-between; margin-top: 30px; border-top: 1px solid var(--border); padding-top: 20px; }
+
+.progress-bar-container { width: 150px; height: 6px; background: #E5E5E7; border-radius: 3px; overflow: hidden; }
+.progress-bar { width: 0%; height: 100%; background: var(--primary); transition: width 0.3s ease; }
+
+@media (max-width: 600px) {
+    .premium-title { font-size: 2rem; }
+    .question-card { padding: 24px; }
+    .question-text { font-size: 1.1rem; }
+}
