@@ -5,15 +5,26 @@ let currentNode = null;
 let currentQuestions = [];
 let currentQuestionIndex = 0;
 let userAnswers = {}; // 暫存本次練習的答案狀況
+let currentLevel = 'beginner'; // 預設難度
 
 // DOM 元素
 const loginPage = document.getElementById('login-page');
 const dashboardPage = document.getElementById('dashboard-page');
 const practicePage = document.getElementById('practice-page');
+const teacherPage = document.getElementById('teacher-page');
 
 const studentInput = document.getElementById('student-number');
 const loginBtn = document.getElementById('login-btn');
 const loginError = document.getElementById('login-error');
+
+// 新增追蹤變數
+let practiceStartTime = null;
+let customMapping = JSON.parse(localStorage.getItem('custom_student_mapping'));
+
+// 獲取目前的學生清單（優先使用自定義）
+function getMapping() {
+    return customMapping || STUDENT_MAPPING;
+}
 
 // 初始化
 function init() {
@@ -32,6 +43,34 @@ function setupEventListeners() {
     document.getElementById('prev-btn').addEventListener('click', prevQuestion);
     document.getElementById('next-btn').addEventListener('click', nextQuestion);
     document.getElementById('finish-btn').addEventListener('click', finishPractice);
+
+    // 難度選擇
+    document.querySelectorAll('.diff-tab').forEach(tab => {
+        tab.addEventListener('click', (e) => {
+            document.querySelectorAll('.diff-tab').forEach(t => t.classList.remove('active'));
+            e.target.classList.add('active');
+            currentLevel = e.target.dataset.level;
+            renderNodes(); // 重新渲染卡片狀態
+        });
+    });
+
+    // 教師端監聽
+    document.getElementById('teacher-back-btn').addEventListener('click', handleLogout);
+    document.getElementById('refresh-btn').addEventListener('click', renderTeacherDashboard);
+    document.getElementById('student-search').addEventListener('input', renderTeacherDashboard);
+    
+    // ODS 上傳處理
+    const odsInput = document.getElementById('ods-input');
+    const dropZone = document.getElementById('drop-zone');
+
+    odsInput.addEventListener('change', (e) => handleOdsUpload(e.target.files[0]));
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+        handleOdsUpload(e.dataTransfer.files[0]);
+    });
 }
 
 // 登入處理
@@ -42,20 +81,28 @@ function handleLogin() {
         return;
     }
 
-    if (STUDENT_MAPPING[num]) {
-        currentUser = { ...STUDENT_MAPPING[num], id: num };
+    // 教師登入判斷
+    if (num.toLowerCase() === 'admin' || num === 'teacher') {
+        showTeacherPage();
+        return;
+    }
+
+    const mapping = getMapping();
+    if (mapping[num]) {
+        currentUser = { ...mapping[num], id: num };
         localStorage.setItem('quiz_user_id', num);
         loadUserProgress(num);
         showDashboard();
     } else {
-        showError('找不到該號碼，請重新輸入 (試試 2, 4, 9)');
+        showError('找不到該號碼，請重新輸入');
     }
 }
 
 function checkAutoLogin() {
     const savedId = localStorage.getItem('quiz_user_id');
-    if (savedId && STUDENT_MAPPING[savedId]) {
-        currentUser = { ...STUDENT_MAPPING[savedId], id: savedId };
+    const mapping = getMapping();
+    if (savedId && mapping[savedId]) {
+        currentUser = { ...mapping[savedId], id: savedId };
         loadUserProgress(savedId);
         showDashboard();
     }
@@ -82,7 +129,7 @@ function saveProgress() {
 
 // 導航
 function hideAllPages() {
-    [loginPage, dashboardPage, practicePage].forEach(p => p.classList.remove('active'));
+    [loginPage, dashboardPage, practicePage, teacherPage].forEach(p => p.classList.remove('active'));
 }
 
 function showDashboard() {
@@ -92,12 +139,21 @@ function showDashboard() {
     renderNodes();
 }
 
+function showTeacherPage() {
+    hideAllPages();
+    teacherPage.classList.add('active');
+    renderTeacherDashboard();
+}
+
 function renderNodes() {
     const grid = document.getElementById('nodes-grid');
     grid.innerHTML = '';
 
-    currentUser.weakNodes.forEach(nodeCode => {
-        const isCompleted = userProgress[nodeCode] === true;
+    // 使用 Set 確保沒有重複的弱點卡片
+    const uniqueWeakNodes = [...new Set(currentUser.weakNodes)];
+
+    uniqueWeakNodes.forEach(nodeCode => {
+        const isCompleted = userProgress[`${nodeCode}_${currentLevel}`] === true;
         const description = NODES_DESCRIPTIONS[nodeCode] || "數學知識點";
         
         const card = document.createElement('div');
@@ -121,18 +177,23 @@ function renderNodes() {
 // 練習邏輯
 window.startPractice = function(nodeCode) {
     currentNode = nodeCode;
-    currentQuestions = QUESTION_BANK[nodeCode] || [];
+    const levelQuestions = (QUESTION_BANK[nodeCode] && QUESTION_BANK[nodeCode][currentLevel]) ? QUESTION_BANK[nodeCode][currentLevel] : [];
+    
+    currentQuestions = levelQuestions.slice(0, 5);
     currentQuestionIndex = 0;
-    userAnswers = {}; // 重置作答
+    userAnswers = {}; 
+    practiceStartTime = new Date(); // 紀錄開始時間
     
     if (currentQuestions.length === 0) {
-        alert("目前該章節尚無題目。");
+        alert("目前該難度尚無題目。");
         return;
     }
 
     hideAllPages();
     practicePage.classList.add('active');
-    document.getElementById('current-node-title').textContent = nodeCode;
+    
+    const levelName = { 'beginner': '初級', 'intermediate': '中級', 'advanced': '高級' }[currentLevel];
+    document.getElementById('current-node-title').textContent = `${nodeCode} (${levelName})`;
     updateQuestionUI();
 };
 
@@ -221,16 +282,136 @@ function prevQuestion() {
 }
 
 function finishPractice() {
-    // 檢查是否全部作答完畢
     if (Object.keys(userAnswers).length < currentQuestions.length) {
         alert("請完成所有題目後再完成練習。");
         return;
     }
     
-    userProgress[currentNode] = true;
+    const endTime = new Date();
+    const duration = Math.floor((endTime - practiceStartTime) / 1000); // 秒
+    let correctCount = 0;
+    currentQuestions.forEach((q, idx) => {
+        if (userAnswers[idx] === q.correct) correctCount++;
+    });
+
+    // 將該節點在該難度的狀態記為完成
+    userProgress[`${currentNode}_${currentLevel}`] = true;
     saveProgress();
-    alert("恭喜完成這項弱點的練習！");
+
+    // 紀錄數據提供給教師後台
+    saveQuizRecord(correctCount, currentQuestions.length, duration);
+
+    alert(`恭喜完成！答對 ${correctCount} / ${currentQuestions.length} 題。`);
     showDashboard();
+}
+
+function saveQuizRecord(correct, total, seconds) {
+    const records = JSON.parse(localStorage.getItem('quiz_total_records') || '[]');
+    records.push({
+        studentId: currentUser.id,
+        name: currentUser.name,
+        node: currentNode,
+        level: currentLevel,
+        score: `${correct}/${total}`,
+        accuracy: Math.round((correct / total) * 100) + '%',
+        duration: seconds,
+        time: new Date().toLocaleString()
+    });
+    localStorage.setItem('quiz_total_records', JSON.stringify(records));
+}
+
+// 教師後台邏輯
+function handleOdsUpload(file) {
+    if (!file) return;
+    const status = document.getElementById('upload-status');
+    status.textContent = "正在處理檔案...";
+    status.className = "status-msg";
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+            const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+            
+            // 解析邏輯 (兼容 sync_to_web.py 格式)
+            // 尋找答對率為 0 的節點
+            const newMapping = {};
+            const headers = jsonData[2]; // 假設標題在第三列
+            
+            for (let i = 3; i < jsonData.length; i++) {
+                const row = jsonData[i];
+                if (!row || row.length === 0) continue;
+                
+                const nameStr = String(row[2]); // 姓名通常在第三欄
+                const match = nameStr.match(/(\d+)號/);
+                const id = match ? match[1] : `ID_${i}`;
+                const name = nameStr.split('號').pop().trim();
+                
+                const weakNodes = [];
+                for (let j = 3; j < row.length; j++) {
+                    const cellValue = row[j];
+                    if (cellValue === 0) {
+                        const nodeCode = headers[j].split(' ')[0];
+                        if (nodeCode.includes('-')) weakNodes.push(nodeCode);
+                    }
+                }
+                
+                newMapping[id] = {
+                    name: name,
+                    fullName: nameStr,
+                    weakNodes: weakNodes
+                };
+            }
+
+            customMapping = newMapping;
+            localStorage.setItem('custom_student_mapping', JSON.stringify(newMapping));
+            status.textContent = "✅ 名單更新成功！可在後台查看最新資料。";
+            status.classList.add('success');
+            renderTeacherDashboard();
+        } catch (err) {
+            console.error(err);
+            status.textContent = "❌ 解析失敗，請檢查檔案格式。";
+            status.classList.add('error');
+        }
+    };
+    reader.readAsArrayBuffer(file);
+}
+
+function renderTeacherDashboard() {
+    const tbody = document.getElementById('report-tbody');
+    const search = document.getElementById('student-search').value.toLowerCase();
+    const records = JSON.parse(localStorage.getItem('quiz_total_records') || '[]');
+    
+    tbody.innerHTML = '';
+    
+    // 過濾搜尋
+    const filtered = records.filter(r => 
+        r.name.toLowerCase().includes(search) || r.studentId.includes(search)
+    ).reverse(); // 最新優先顯示
+
+    filtered.forEach(r => {
+        const tr = document.createElement('tr');
+        const levelName = { 'beginner': '初級', 'intermediate': '中級', 'advanced': '高級' }[r.level];
+        tr.innerHTML = `
+            <td>${r.studentId}</td>
+            <td>${r.name}</td>
+            <td>${r.node}</td>
+            <td>${levelName}</td>
+            <td>${r.accuracy} (${r.score})</td>
+            <td>${formatDuration(r.duration)}</td>
+            <td>${r.time}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function formatDuration(sec) {
+    if (sec < 60) return sec + '秒';
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${m}分${s}秒`;
 }
 
 function showError(msg) {
@@ -238,5 +419,4 @@ function showError(msg) {
     setTimeout(() => { loginError.textContent = ''; }, 3000);
 }
 
-// 啟動應用
 init();
