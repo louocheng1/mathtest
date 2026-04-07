@@ -239,8 +239,12 @@ function renderNodes() {
 
 // 練習邏輯
 window.startPractice = function (nodeCode) {
+    if (nodeCode) nodeCode = String(nodeCode).toUpperCase();
     currentNode = nodeCode;
-    const levelQuestions = (QUESTION_BANK[nodeCode] && QUESTION_BANK[nodeCode][currentLevel]) ? QUESTION_BANK[nodeCode][currentLevel] : [];
+    let levelQuestions = (QUESTION_BANK[nodeCode] && QUESTION_BANK[nodeCode][currentLevel]) ? QUESTION_BANK[nodeCode][currentLevel] : [];
+
+    // 重新更新題目：隨機排序
+    levelQuestions = [...levelQuestions].sort(() => 0.5 - Math.random());
 
     currentQuestions = levelQuestions.slice(0, 5);
     currentQuestionIndex = 0;
@@ -425,8 +429,10 @@ function handleOdsUpload(file) {
                 for (let j = 3; j < row.length; j++) {
                     const cellValue = row[j];
                     if (cellValue === 0) {
-                        const nodeCode = headers[j].split(' ')[0];
-                        if (nodeCode.includes('-')) weakNodes.push(nodeCode);
+                        let nodeCode = headers[j].split(' ')[0];
+                        if (nodeCode && nodeCode.includes('-')) {
+                            weakNodes.push(String(nodeCode).toUpperCase());
+                        }
                     }
                 }
 
