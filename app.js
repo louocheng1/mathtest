@@ -26,8 +26,22 @@ function getMapping() {
     return customMapping || STUDENT_MAPPING;
 }
 
+// 將 Python 生成的額外題庫合併進原有題庫中
+function mergeExtraQuestions() {
+    if (typeof EXTRA_QUESTION_BANK !== 'undefined') {
+        Object.keys(EXTRA_QUESTION_BANK).forEach(node => {
+            if (!QUESTION_BANK[node]) QUESTION_BANK[node] = {};
+            Object.keys(EXTRA_QUESTION_BANK[node]).forEach(level => {
+                if (!QUESTION_BANK[node][level]) QUESTION_BANK[node][level] = [];
+                QUESTION_BANK[node][level].push(...EXTRA_QUESTION_BANK[node][level]);
+            });
+        });
+    }
+}
+
 // 初始化
 function init() {
+    mergeExtraQuestions();
     setupEventListeners();
     checkAutoLogin();
 }
@@ -59,7 +73,7 @@ function setupEventListeners() {
     document.getElementById('refresh-btn').addEventListener('click', renderTeacherDashboard);
     document.getElementById('student-search').addEventListener('input', renderTeacherDashboard);
     document.getElementById('clear-records-btn').addEventListener('click', clearRecords);
-    
+
     // ODS 上傳處理
     const odsInput = document.getElementById('ods-input');
     const dropZone = document.getElementById('drop-zone');
@@ -138,11 +152,11 @@ function handleLogout() {
 async function loadUserProgress(userId) {
     // 優先從雲端讀取
     const cloudProgress = await DatabaseService.getProgress(userId);
-    
+
     // 與本地合併 (若雲端無資料則回歸本地 localStorage)
     const localSaved = localStorage.getItem(`quiz_progress_${userId}`);
     const localProgress = localSaved ? JSON.parse(localSaved) : {};
-    
+
     userProgress = { ...localProgress, ...cloudProgress };
 }
 
@@ -168,7 +182,7 @@ function showTeacherPage() {
     hideAllPages();
     teacherPage.classList.add('active');
     renderTeacherDashboard();
-    
+
     // 每 30 秒自動重新整理數據 (動態監控)
     if (window.teacherInterval) clearInterval(window.teacherInterval);
     window.teacherInterval = setInterval(() => {
@@ -191,7 +205,7 @@ function renderNodes() {
         const isCompleted = userProgress[`${nodeCode}_${currentLevel}`] === true;
         const lastScore = userProgress[`${nodeCode}_${currentLevel}_score`];
         const description = NODES_DESCRIPTIONS[nodeCode] || "數學知識點";
-        
+
         const card = document.createElement('div');
         card.className = 'node-card';
         card.innerHTML = `
@@ -212,15 +226,15 @@ function renderNodes() {
 }
 
 // 練習邏輯
-window.startPractice = function(nodeCode) {
+window.startPractice = function (nodeCode) {
     currentNode = nodeCode;
     const levelQuestions = (QUESTION_BANK[nodeCode] && QUESTION_BANK[nodeCode][currentLevel]) ? QUESTION_BANK[nodeCode][currentLevel] : [];
-    
+
     currentQuestions = levelQuestions.slice(0, 5);
     currentQuestionIndex = 0;
-    userAnswers = {}; 
+    userAnswers = {};
     practiceStartTime = new Date(); // 紀錄開始時間
-    
+
     if (currentQuestions.length === 0) {
         alert("目前該難度尚無題目。");
         return;
@@ -228,7 +242,7 @@ window.startPractice = function(nodeCode) {
 
     hideAllPages();
     practicePage.classList.add('active');
-    
+
     const levelName = { 'beginner': '初級', 'intermediate': '中級', 'advanced': '高級' }[currentLevel];
     document.getElementById('current-node-title').textContent = `${nodeCode} (${levelName})`;
     updateQuestionUI();
@@ -238,10 +252,10 @@ function updateQuestionUI() {
     const q = currentQuestions[currentQuestionIndex];
     document.getElementById('question-number').textContent = `第 ${currentQuestionIndex + 1} / ${currentQuestions.length} 題`;
     document.getElementById('question-text').textContent = q.q;
-    
+
     const optionsContainer = document.getElementById('options-container');
     optionsContainer.innerHTML = '';
-    
+
     const feedbackArea = document.getElementById('feedback-area');
     feedbackArea.classList.add('hidden');
 
@@ -251,9 +265,9 @@ function updateQuestionUI() {
         const btn = document.createElement('button');
         btn.className = 'option-btn';
         btn.innerHTML = `<strong>${String.fromCharCode(65 + idx)}.</strong> ${opt}`;
-        
+
         btn.addEventListener('click', () => handleOptionSelect(idx));
-        
+
         // 如果已經作答過
         if (previousAnswer !== undefined) {
             btn.disabled = true;
@@ -268,11 +282,11 @@ function updateQuestionUI() {
 
     // 按鈕控制
     document.getElementById('prev-btn').style.visibility = (currentQuestionIndex > 0) ? 'visible' : 'hidden';
-    
+
     const isLast = currentQuestionIndex === currentQuestions.length - 1;
     document.getElementById('next-btn').classList.toggle('hidden', isLast);
     document.getElementById('finish-btn').classList.toggle('hidden', !isLast);
-    
+
     // 進度條
     const progress = ((currentQuestionIndex + 1) / currentQuestions.length) * 100;
     document.getElementById('progress-bar').style.width = `${progress}%`;
@@ -281,7 +295,7 @@ function updateQuestionUI() {
 function handleOptionSelect(index) {
     const q = currentQuestions[currentQuestionIndex];
     userAnswers[currentQuestionIndex] = index;
-    
+
     const btns = document.querySelectorAll('.option-btn');
     btns.forEach((btn, idx) => {
         btn.disabled = true;
@@ -296,11 +310,11 @@ function showFeedback(isCorrect) {
     const q = currentQuestions[currentQuestionIndex];
     const feedbackArea = document.getElementById('feedback-area');
     const banner = document.getElementById('result-banner');
-    
+
     feedbackArea.classList.remove('hidden');
     banner.textContent = isCorrect ? '✨ 太棒了！答對了！' : '📌 加油！正確答案如上標示。';
     banner.className = `result-banner ${isCorrect ? 'success' : 'error'}`;
-    
+
     document.getElementById('explanation-text').textContent = q.exp;
 }
 
@@ -323,7 +337,7 @@ function finishPractice() {
         alert("請完成所有題目後再完成練習。");
         return;
     }
-    
+
     const endTime = new Date();
     const duration = Math.floor((endTime - practiceStartTime) / 1000); // 秒
     let correctCount = 0;
@@ -338,12 +352,12 @@ function finishPractice() {
 
     // 存入雲端資料庫
     DatabaseService.saveQuizResult(
-        currentUser.id, 
-        currentUser.name, 
-        currentNode, 
-        currentLevel, 
-        correctCount, 
-        currentQuestions.length, 
+        currentUser.id,
+        currentUser.name,
+        currentNode,
+        currentLevel,
+        correctCount,
+        currentQuestions.length,
         duration
     );
 
@@ -374,27 +388,27 @@ function handleOdsUpload(file) {
     status.className = "status-msg";
 
     const reader = new FileReader();
-    reader.onload = function(e) {
+    reader.onload = function (e) {
         try {
             const data = new Uint8Array(e.target.result);
             const workbook = XLSX.read(data, { type: 'array' });
             const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
             const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
-            
+
             // 解析邏輯 (兼容 sync_to_web.py 格式)
             // 尋找答對率為 0 的節點
             const newMapping = {};
             const headers = jsonData[2]; // 假設標題在第三列
-            
+
             for (let i = 3; i < jsonData.length; i++) {
                 const row = jsonData[i];
                 if (!row || row.length === 0) continue;
-                
+
                 const nameStr = String(row[2]); // 姓名通常在第三欄
                 const match = nameStr.match(/(\d+)號/);
                 const id = match ? match[1] : `ID_${i}`;
                 const name = nameStr.split('號').pop().trim();
-                
+
                 const weakNodes = [];
                 for (let j = 3; j < row.length; j++) {
                     const cellValue = row[j];
@@ -403,7 +417,7 @@ function handleOdsUpload(file) {
                         if (nodeCode.includes('-')) weakNodes.push(nodeCode);
                     }
                 }
-                
+
                 newMapping[id] = {
                     name: name,
                     fullName: nameStr,
@@ -413,7 +427,7 @@ function handleOdsUpload(file) {
 
             customMapping = newMapping;
             localStorage.setItem('custom_student_mapping', JSON.stringify(newMapping));
-            
+
             // 同步至雲端
             DatabaseService.syncStudents(newMapping);
 
@@ -444,7 +458,7 @@ async function renderProgressOverview() {
         DatabaseService.getAllStudents(),
         DatabaseService.getAllProgress()
     ]);
-    
+
     tbody.innerHTML = '';
 
     if (!cloudStudents || cloudStudents.length === 0) {
@@ -458,14 +472,14 @@ async function renderProgressOverview() {
     cloudStudents.forEach(student => {
         const studentWeakNodes = [...new Set(student.weak_nodes || [])];
         const totalPossible = studentWeakNodes.length;
-        
+
         // 篩選該學生的進度
         const pList = allCloudProgress.filter(p => p.student_id === student.id);
         const progress = pList.reduce((acc, cur) => {
             acc[`${cur.node_code}_${cur.level}`] = cur.is_completed;
             return acc;
         }, {});
-        
+
         let completedCount = 0;
         let bCount = 0, iCount = 0, aCount = 0;
 
@@ -477,7 +491,7 @@ async function renderProgressOverview() {
 
         const totalTasks = totalPossible * 3; // 三個難度
         const percent = totalTasks > 0 ? Math.round((completedCount / totalTasks) * 100) : 0;
-        
+
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td>${student.id}</td>
@@ -498,15 +512,15 @@ async function renderProgressOverview() {
 async function renderActivityLog() {
     const tbody = document.getElementById('report-tbody');
     const search = document.getElementById('student-search').value.toLowerCase();
-    
+
     if (!tbody) return;
     tbody.innerHTML = '<tr><td colspan="7" style="text-align:center">載入數據中...</td></tr>';
 
     // 從雲端獲取紀錄
     const records = await DatabaseService.getAllLogs();
-    
+
     tbody.innerHTML = '';
-    
+
     // 過濾搜尋
     const filtered = records.filter(r => {
         const nameMatch = r.name && String(r.name).toLowerCase().includes(search);
