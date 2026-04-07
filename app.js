@@ -348,7 +348,7 @@ function prevQuestion() {
     }
 }
 
-function finishPractice() {
+async function finishPractice() {
     if (Object.keys(userAnswers).length < currentQuestions.length) {
         alert("請完成所有題目後再完成練習。");
         return;
@@ -366,8 +366,8 @@ function finishPractice() {
     userProgress[`${currentNode}_${currentLevel}_score`] = `${correctCount}/${currentQuestions.length}`;
     saveProgress();
 
-    // 存入雲端資料庫
-    DatabaseService.saveQuizResult(
+    // 存入雲端資料庫 (加入 Await 確保傳送完成)
+    const success = await DatabaseService.saveQuizResult(
         currentUser.id,
         currentUser.name,
         currentNode,
@@ -377,7 +377,11 @@ function finishPractice() {
         duration
     );
 
-    alert(`恭喜完成！答對 ${correctCount} / ${currentQuestions.length} 題。`);
+    if (success) {
+        alert(`🎉 恭喜完成並同步成功！答對 ${correctCount} / ${currentQuestions.length} 題。`);
+    } else {
+        alert(`完成練習！答對 ${correctCount} / ${currentQuestions.length} 題。(但雲端同步失敗，請確認網路或聯絡老師)`);
+    }
     showDashboard();
 }
 

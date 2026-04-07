@@ -91,7 +91,12 @@ const DatabaseService = {
                 created_at: new Date()
             }]);
 
-        if (logError) console.error('寫入 Log 失敗:', logError);
+        if (logError) {
+            console.error('寫入 Log 失敗:', logError);
+            alert('⚠️ 雲端紀錄傳送失敗！這可能是 RLS 設定或是網路連線問題。');
+            return false;
+        }
+        return true;
     },
 
     // 教師端：獲取所有學生名單
