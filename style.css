@@ -74,7 +74,7 @@ button {
 
 /* 登入頁 */
 .login-container { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
-.premium-title { font-size: 2.5rem; font-weight: 800; margin-bottom: 8px; background: linear-gradient(135deg, #007AFF 0%, #5AC8FA 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.premium-title { font-size: 2.5rem; font-weight: 800; margin-bottom: 8px; background: linear-gradient(135deg, #007AFF 0%, #5AC8FA 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
 .subtitle { font-size: 1.1rem; color: var(--text-muted); margin-bottom: 40px; }
 .login-card { width: 100%; max-width: 400px; padding: 40px; border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.05); text-align: center; }
 .input-group { display: flex; flex-direction: column; gap: 16px; margin-top: 24px; }
@@ -204,6 +204,64 @@ input:focus { border-color: var(--primary); }
 .report-table th { background: #F8F9FA; font-weight: 700; color: var(--text-muted); position: sticky; top: 0; }
 .report-table tr:last-child td { border-bottom: none; }
 .report-table tr:hover { background: #F2F2F7; }
+
+/* 摘要統計樣式 */
+.summary-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 25px;
+}
+
+.summary-card {
+    padding: 20px;
+    background: #F8F9FA;
+    border-radius: 12px;
+    text-align: center;
+    border: 1px solid var(--border);
+}
+
+.summary-card h4 {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+}
+
+.summary-card .value {
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: var(--primary);
+}
+
+.progress-tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.progress-tag.high { background: rgba(52, 199, 89, 0.1); color: var(--success); }
+.progress-tag.low { background: rgba(255, 59, 48, 0.1); color: var(--error); }
+
+.last-score {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: 5px;
+    display: block;
+}
+
+.btn-danger {
+    background: transparent;
+    color: var(--error);
+    border: 1.5px solid var(--error);
+    font-size: 0.85rem;
+    padding: 6px 12px;
+}
+
+.btn-danger:hover {
+    background: rgba(255, 59, 48, 0.05);
+}
 
 @media (max-width: 600px) {
     .premium-title { font-size: 2rem; }

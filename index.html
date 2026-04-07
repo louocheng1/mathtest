@@ -125,7 +125,34 @@
                 </section>
 
                 <section class="teacher-section card glass">
-                    <h2>學生練習動態監控</h2>
+                    <div class="section-header">
+                        <h2>學生練習進度總覽</h2>
+                        <span class="section-desc">統計每位學生在目前所有弱點節點的完成狀況。</span>
+                    </div>
+                    <div class="table-wrapper">
+                        <table class="report-table">
+                            <thead>
+                                <tr>
+                                    <th>學號</th>
+                                    <th>姓名</th>
+                                    <th>總弱點數</th>
+                                    <th>已完成(初/中/高)</th>
+                                    <th>完成率</th>
+                                    <th>狀態</th>
+                                </tr>
+                            </thead>
+                            <tbody id="summary-tbody"></tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <section class="teacher-section card glass">
+                    <div class="section-header">
+                        <h2>學生練習活動紀錄</h2>
+                        <div class="header-actions">
+                            <button id="clear-records-btn" class="btn-danger">清空所有紀錄</button>
+                        </div>
+                    </div>
                     <div class="table-controls">
                         <input type="text" id="student-search" placeholder="搜尋姓名或學號...">
                         <button id="refresh-btn" class="btn-outline">重新整理數據</button>

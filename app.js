@@ -58,6 +58,7 @@ function setupEventListeners() {
     document.getElementById('teacher-back-btn').addEventListener('click', handleLogout);
     document.getElementById('refresh-btn').addEventListener('click', renderTeacherDashboard);
     document.getElementById('student-search').addEventListener('input', renderTeacherDashboard);
+    document.getElementById('clear-records-btn').addEventListener('click', clearRecords);
     
     // ODS 上傳處理
     const odsInput = document.getElementById('ods-input');
@@ -111,6 +112,7 @@ function checkAutoLogin() {
 function handleLogout() {
     localStorage.removeItem('quiz_user_id');
     currentUser = null;
+    userProgress = {}; // 清除進度暫存
     hideAllPages();
     loginPage.classList.add('active');
 }
@@ -143,6 +145,16 @@ function showTeacherPage() {
     hideAllPages();
     teacherPage.classList.add('active');
     renderTeacherDashboard();
+    
+    // 每 30 秒自動重新整理數據 (動態監控)
+    if (window.teacherInterval) clearInterval(window.teacherInterval);
+    window.teacherInterval = setInterval(() => {
+        if (teacherPage.classList.contains('active')) {
+            renderTeacherDashboard();
+        } else {
+            clearInterval(window.teacherInterval);
+        }
+    }, 30000);
 }
 
 function renderNodes() {
@@ -154,6 +166,7 @@ function renderNodes() {
 
     uniqueWeakNodes.forEach(nodeCode => {
         const isCompleted = userProgress[`${nodeCode}_${currentLevel}`] === true;
+        const lastScore = userProgress[`${nodeCode}_${currentLevel}_score`];
         const description = NODES_DESCRIPTIONS[nodeCode] || "數學知識點";
         
         const card = document.createElement('div');
@@ -165,6 +178,7 @@ function renderNodes() {
                 <span class="status-badge ${isCompleted ? 'completed' : ''}">
                     ${isCompleted ? '✓ 練習完成' : '未練習'}
                 </span>
+                ${isCompleted && lastScore ? `<span class="last-score">上次得分：${lastScore}</span>` : ''}
             </div>
             <button class="btn-outline" style="margin-top: 20px" onclick="startPractice('${nodeCode}')">
                 ${isCompleted ? '再次挑戰' : '開始練習'}
@@ -296,6 +310,7 @@ function finishPractice() {
 
     // 將該節點在該難度的狀態記為完成
     userProgress[`${currentNode}_${currentLevel}`] = true;
+    userProgress[`${currentNode}_${currentLevel}_score`] = `${correctCount}/${currentQuestions.length}`;
     saveProgress();
 
     // 紀錄數據提供給教師後台
@@ -380,24 +395,77 @@ function handleOdsUpload(file) {
 }
 
 function renderTeacherDashboard() {
+    renderProgressOverview();
+    renderActivityLog();
+}
+
+function renderProgressOverview() {
+    const tbody = document.getElementById('summary-tbody');
+    const mapping = getMapping();
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    Object.keys(mapping).sort((a, b) => parseInt(a) - parseInt(b)).forEach(id => {
+        const student = mapping[id];
+        const studentWeakNodes = [...new Set(student.weakNodes || [])];
+        const totalPossible = studentWeakNodes.length;
+        
+        // 載入該學生的進度
+        const studentProgressStr = localStorage.getItem(`quiz_progress_${id}`);
+        const progress = studentProgressStr ? JSON.parse(studentProgressStr) : {};
+        
+        let completedCount = 0;
+        let bCount = 0, iCount = 0, aCount = 0;
+
+        studentWeakNodes.forEach(node => {
+            if (progress[`${node}_beginner`]) { completedCount++; bCount++; }
+            if (progress[`${node}_intermediate`]) { completedCount++; iCount++; }
+            if (progress[`${node}_advanced`]) { completedCount++; aCount++; }
+        });
+
+        const totalTasks = totalPossible * 3; // 三個難度
+        const percent = totalTasks > 0 ? Math.round((completedCount / totalTasks) * 100) : 0;
+        
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${id}</td>
+            <td>${student.name}</td>
+            <td>${totalPossible} 個弱點</td>
+            <td>${bCount} / ${iCount} / ${aCount}</td>
+            <td>${percent}%</td>
+            <td>
+                <span class="progress-tag ${percent >= 80 ? 'high' : 'low'}">
+                    ${percent >= 80 ? '表現優異' : percent >= 30 ? '穩定練習' : '尚未開始'}
+                </span>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function renderActivityLog() {
     const tbody = document.getElementById('report-tbody');
     const search = document.getElementById('student-search').value.toLowerCase();
     const records = JSON.parse(localStorage.getItem('quiz_total_records') || '[]');
     
+    if (!tbody) return;
     tbody.innerHTML = '';
     
-    // 過濾搜尋
-    const filtered = records.filter(r => 
-        r.name.toLowerCase().includes(search) || r.studentId.includes(search)
-    ).reverse(); // 最新優先顯示
+    // 過濾搜尋 (加上安全檢查)
+    const filtered = records.filter(r => {
+        const nameMatch = r.name && String(r.name).toLowerCase().includes(search);
+        const idMatch = r.studentId && String(r.studentId).includes(search);
+        return nameMatch || idMatch;
+    }).reverse();
 
     filtered.forEach(r => {
         const tr = document.createElement('tr');
         const levelName = { 'beginner': '初級', 'intermediate': '中級', 'advanced': '高級' }[r.level];
+        const nodeTitle = NODES_DESCRIPTIONS[r.node] || r.node;
         tr.innerHTML = `
             <td>${r.studentId}</td>
             <td>${r.name}</td>
-            <td>${r.node}</td>
+            <td><span class="node-code" style="margin:0">${r.node}</span><br>${nodeTitle}</td>
             <td>${levelName}</td>
             <td>${r.accuracy} (${r.score})</td>
             <td>${formatDuration(r.duration)}</td>
@@ -405,6 +473,13 @@ function renderTeacherDashboard() {
         `;
         tbody.appendChild(tr);
     });
+}
+
+function clearRecords() {
+    if (confirm("確定要清空所有活動紀錄嗎？這不會影響學生的練習進度。")) {
+        localStorage.removeItem('quiz_total_records');
+        renderTeacherDashboard();
+    }
 }
 
 function formatDuration(sec) {
