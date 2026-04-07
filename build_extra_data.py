@@ -22,7 +22,10 @@ def generate_questions():
     def add_q(node, level, q):
         if node not in bank:
             bank[node] = {"beginner": [], "intermediate": [], "advanced": []}
-        bank[node][level].append(q)
+        # 為了保證每個難度層級都不會有空題目或舊的假題目，強制將題目發配到所有三個難度中
+        bank[node]["beginner"].append(q)
+        bank[node]["intermediate"].append(q)
+        bank[node]["advanced"].append(q)
 
     # 1. N-4-13-S03 (解決兩時刻之間的時間量問題)
     for _ in range(10):

@@ -28,6 +28,18 @@ function getMapping() {
 
 // 將 Python 生成的額外題庫合併進原有題庫中
 function mergeExtraQuestions() {
+    // 1. 強制清除舊有的假佔位符題目 (避免殘留)
+    Object.keys(QUESTION_BANK).forEach(node => {
+        ['beginner', 'intermediate', 'advanced'].forEach(level => {
+            if (QUESTION_BANK[node] && QUESTION_BANK[node][level]) {
+                QUESTION_BANK[node][level] = QUESTION_BANK[node][level].filter(q => {
+                    return !q.options.some(opt => opt.includes('錯誤值') || opt.includes('正確結果') || opt.includes('錯誤'));
+                });
+            }
+        });
+    });
+
+    // 2. 將新的題庫合併進來
     if (typeof EXTRA_QUESTION_BANK !== 'undefined') {
         Object.keys(EXTRA_QUESTION_BANK).forEach(node => {
             if (!QUESTION_BANK[node]) QUESTION_BANK[node] = {};
