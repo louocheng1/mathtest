@@ -116,7 +116,10 @@ const DatabaseService = {
 
     // 教師端：上傳/更新學生名單與弱點
     async syncStudents(mapping) {
-        if (!supabaseClient) return;
+        if (!supabaseClient) {
+            console.error('Supabase 未初始化');
+            return;
+        }
         const studentData = Object.keys(mapping).map(id => ({
             id: id,
             name: mapping[id].name,
@@ -127,7 +130,13 @@ const DatabaseService = {
             .from('students')
             .upsert(studentData, { onConflict: 'id' });
         
-        if (error) console.error('同步學生名單失敗:', error);
+        if (error) {
+            console.error('同步學生名單失敗:', error);
+            alert('雲端同步失敗！請確認 Supabase 的 CORS 設定包含 http://localhost:8080\n錯誤訊息: ' + error.message);
+        } else {
+            console.log('雲端名單同步成功');
+            alert('✅ 雲端名單與進度已成功初始化！');
+        }
     },
 
     // 清空日誌 (老師用)
