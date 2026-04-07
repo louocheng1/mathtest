@@ -75,7 +75,7 @@ function setupEventListeners() {
 }
 
 // 登入處理
-function handleLogin() {
+async function handleLogin() {
     const num = studentInput.value.trim();
     if (!num) {
         showError('請輸入號碼');
@@ -88,23 +88,40 @@ function handleLogin() {
         return;
     }
 
+    // 優先從資料庫撈取，若無則用本地 mapping
+    let studentData = await DatabaseService.getStudent(num);
     const mapping = getMapping();
-    if (mapping[num]) {
+
+    if (studentData) {
+        currentUser = { ...studentData, weakNodes: studentData.weak_nodes };
+    } else if (mapping[num]) {
         currentUser = { ...mapping[num], id: num };
+    }
+
+    if (currentUser) {
         localStorage.setItem('quiz_user_id', num);
-        loadUserProgress(num);
+        await loadUserProgress(num);
         showDashboard();
     } else {
         showError('找不到該號碼，請重新輸入');
     }
 }
 
-function checkAutoLogin() {
+async function checkAutoLogin() {
     const savedId = localStorage.getItem('quiz_user_id');
+    if (!savedId) return;
+
+    let studentData = await DatabaseService.getStudent(savedId);
     const mapping = getMapping();
-    if (savedId && mapping[savedId]) {
+
+    if (studentData) {
+        currentUser = { ...studentData, weakNodes: studentData.weak_nodes };
+    } else if (mapping[savedId]) {
         currentUser = { ...mapping[savedId], id: savedId };
-        loadUserProgress(savedId);
+    }
+
+    if (currentUser) {
+        await loadUserProgress(savedId);
         showDashboard();
     }
 }
@@ -118,9 +135,15 @@ function handleLogout() {
 }
 
 // 進度管理
-function loadUserProgress(userId) {
-    const savedProgress = localStorage.getItem(`quiz_progress_${userId}`);
-    userProgress = savedProgress ? JSON.parse(savedProgress) : {};
+async function loadUserProgress(userId) {
+    // 優先從雲端讀取
+    const cloudProgress = await DatabaseService.getProgress(userId);
+    
+    // 與本地合併 (若雲端無資料則回歸本地 localStorage)
+    const localSaved = localStorage.getItem(`quiz_progress_${userId}`);
+    const localProgress = localSaved ? JSON.parse(localSaved) : {};
+    
+    userProgress = { ...localProgress, ...cloudProgress };
 }
 
 function saveProgress() {
@@ -313,8 +336,16 @@ function finishPractice() {
     userProgress[`${currentNode}_${currentLevel}_score`] = `${correctCount}/${currentQuestions.length}`;
     saveProgress();
 
-    // 紀錄數據提供給教師後台
-    saveQuizRecord(correctCount, currentQuestions.length, duration);
+    // 存入雲端資料庫
+    DatabaseService.saveQuizResult(
+        currentUser.id, 
+        currentUser.name, 
+        currentNode, 
+        currentLevel, 
+        correctCount, 
+        currentQuestions.length, 
+        duration
+    );
 
     alert(`恭喜完成！答對 ${correctCount} / ${currentQuestions.length} 題。`);
     showDashboard();
@@ -382,6 +413,10 @@ function handleOdsUpload(file) {
 
             customMapping = newMapping;
             localStorage.setItem('custom_student_mapping', JSON.stringify(newMapping));
+            
+            // 同步至雲端
+            DatabaseService.syncStudents(newMapping);
+
             status.textContent = "✅ 名單更新成功！可在後台查看最新資料。";
             status.classList.add('success');
             renderTeacherDashboard();
@@ -399,20 +434,37 @@ function renderTeacherDashboard() {
     renderActivityLog();
 }
 
-function renderProgressOverview() {
+async function renderProgressOverview() {
     const tbody = document.getElementById('summary-tbody');
-    const mapping = getMapping();
     if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center">載入數據中...</td></tr>';
+
+    // 1. 獲取所有「雲端學生名單」與「雲端進度」
+    const [cloudStudents, allCloudProgress] = await Promise.all([
+        DatabaseService.getAllStudents(),
+        DatabaseService.getAllProgress()
+    ]);
+    
     tbody.innerHTML = '';
 
-    Object.keys(mapping).sort((a, b) => parseInt(a) - parseInt(b)).forEach(id => {
-        const student = mapping[id];
-        const studentWeakNodes = [...new Set(student.weakNodes || [])];
+    if (!cloudStudents || cloudStudents.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center">目前雲端沒有學生名單，請上傳 ODS 建立資料。</td></tr>';
+        return;
+    }
+
+    // 依照座號排序
+    cloudStudents.sort((a, b) => parseInt(a.id) - parseInt(b.id));
+
+    cloudStudents.forEach(student => {
+        const studentWeakNodes = [...new Set(student.weak_nodes || [])];
         const totalPossible = studentWeakNodes.length;
         
-        // 載入該學生的進度
-        const studentProgressStr = localStorage.getItem(`quiz_progress_${id}`);
-        const progress = studentProgressStr ? JSON.parse(studentProgressStr) : {};
+        // 篩選該學生的進度
+        const pList = allCloudProgress.filter(p => p.student_id === student.id);
+        const progress = pList.reduce((acc, cur) => {
+            acc[`${cur.node_code}_${cur.level}`] = cur.is_completed;
+            return acc;
+        }, {});
         
         let completedCount = 0;
         let bCount = 0, iCount = 0, aCount = 0;
@@ -428,7 +480,7 @@ function renderProgressOverview() {
         
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td>${id}</td>
+            <td>${student.id}</td>
             <td>${student.name}</td>
             <td>${totalPossible} 個弱點</td>
             <td>${bCount} / ${iCount} / ${aCount}</td>
@@ -443,42 +495,47 @@ function renderProgressOverview() {
     });
 }
 
-function renderActivityLog() {
+async function renderActivityLog() {
     const tbody = document.getElementById('report-tbody');
     const search = document.getElementById('student-search').value.toLowerCase();
-    const records = JSON.parse(localStorage.getItem('quiz_total_records') || '[]');
     
     if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center">載入數據中...</td></tr>';
+
+    // 從雲端獲取紀錄
+    const records = await DatabaseService.getAllLogs();
+    
     tbody.innerHTML = '';
     
-    // 過濾搜尋 (加上安全檢查)
+    // 過濾搜尋
     const filtered = records.filter(r => {
         const nameMatch = r.name && String(r.name).toLowerCase().includes(search);
-        const idMatch = r.studentId && String(r.studentId).includes(search);
+        const idMatch = r.student_id && String(r.student_id).includes(search);
         return nameMatch || idMatch;
-    }).reverse();
+    });
 
     filtered.forEach(r => {
         const tr = document.createElement('tr');
         const levelName = { 'beginner': '初級', 'intermediate': '中級', 'advanced': '高級' }[r.level];
-        const nodeTitle = NODES_DESCRIPTIONS[r.node] || r.node;
+        const nodeTitle = NODES_DESCRIPTIONS[r.node_code] || r.node_code;
         tr.innerHTML = `
-            <td>${r.studentId}</td>
+            <td>${r.student_id}</td>
             <td>${r.name}</td>
-            <td><span class="node-code" style="margin:0">${r.node}</span><br>${nodeTitle}</td>
+            <td><span class="node-code" style="margin:0">${r.node_code}</span><br>${nodeTitle}</td>
             <td>${levelName}</td>
             <td>${r.accuracy} (${r.score})</td>
             <td>${formatDuration(r.duration)}</td>
-            <td>${r.time}</td>
+            <td>${new Date(r.created_at).toLocaleString()}</td>
         `;
         tbody.appendChild(tr);
     });
 }
 
 function clearRecords() {
-    if (confirm("確定要清空所有活動紀錄嗎？這不會影響學生的練習進度。")) {
-        localStorage.removeItem('quiz_total_records');
-        renderTeacherDashboard();
+    if (confirm("確定要清空雲端活動紀錄嗎？這不會影響學生的練習進度。")) {
+        DatabaseService.clearAllLogs().then(() => {
+            renderTeacherDashboard();
+        });
     }
 }
 

@@ -94,6 +94,15 @@ const DatabaseService = {
         if (logError) console.error('寫入 Log 失敗:', logError);
     },
 
+    // 教師端：獲取所有學生名單
+    async getAllStudents() {
+        if (!supabaseClient) return [];
+        const { data, error } = await supabaseClient
+            .from('students')
+            .select('*');
+        return error ? [] : data;
+    },
+
     // 教師端：獲取所有學生的進度統計
     async getAllProgress() {
         if (!supabaseClient) return [];
