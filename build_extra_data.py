@@ -1,5 +1,13 @@
 import json
 import random
+from decimal import Decimal, ROUND_HALF_UP
+
+def round_school(num, ndigits):
+    p = "1." + "0" * ndigits
+    if ndigits == 0: p = "1"
+    res = Decimal(str(num)).quantize(Decimal(p), rounding=ROUND_HALF_UP)
+    # Remove trailing zeroes correctly using format or normalize
+    return float(res)
 
 def get_names():
     return ["李聖傑", "王小明", "張大春", "林美麗", "陳威帆", "趙梓翔", "阿信", "老王", "佩佩", "喬治"]
@@ -75,12 +83,12 @@ def generate_questions():
         num = round(random.uniform(10.0, 999.9999), 4)
         pos = random.choice(["第一位", "第二位", "第三位"])
         ndigits = {"第一位": 1, "第二位": 2, "第三位": 3}[pos]
-        res = round(num, ndigits)
+        res = round_school(num, ndigits)
         q_text = f"【天文觀測站】科學家在計算一顆彗星掠過地球的軌道距離時，測量出精確距離為 {num} 萬公里。為了符合新聞報導的統一格式，局長要求必須使用「四捨五入法」取概數到小數{pos}。如果是你負責發布這則新聞，你會寫出哪一個數字呢？"
         correct_str = str(res)
-        w1 = str(round(num + 0.0001, ndigits-1 if ndigits>1 else 0))
-        w2 = str(round(num + 10**(-ndigits), ndigits))
-        w3 = str(round(num - 10**(-ndigits), ndigits))
+        w1 = str(round_school(num + 0.0001, ndigits-1 if ndigits>1 else 0))
+        w2 = str(round_school(num + 10**(-ndigits), ndigits))
+        w3 = str(round_school(num - 10**(-ndigits), ndigits))
         options = list(set([correct_str, w1, w2, w3]))
         while len(options) < 4:
             options.append(str(res + random.random()))
@@ -100,24 +108,7 @@ def generate_questions():
         random.shuffle(options)
         add_q("N-5-3-S02", "advanced", {"q": q_text, "options": options, "correct": options.index(correct_str), "exp": f"能將 {target} 整除的才是它的因數。{correct_str} 不能整除 {target}，所以不可能。"})
 
-    # 我們為剩餘的知識點產生泛用型高難度問題...
-    nodes = [
-        "N-5-3-S03", "N-5-3-S07", "N-5-4-S03", "N-5-5-S06", "N-5-6-S04", 
-        "N-5-7-S01", "N-5-8-S02", "N-5-9-S03", "R-4-2-S04", "R-4-4-S01", 
-        "R-5-1-S01", "R-5-1-S04", "R-5-2-S01", "R-5-2-S07", "R-5-3-S01", 
-        "S-5-1-S02", "S-5-2-S01", "S-5-3-S03", "S-5-5-S02", "S-5-6-S05", "S-5-7-S05"
-    ]
-    for n in nodes:
-        for _ in range(10):
-            # 隨機產生較難的大數字問題
-            v1 = random.randint(100, 999)
-            v2 = random.randint(10, 99)
-            q_text = f"【綜合邏輯測試-進階加強版】在一個複雜的專案任務中，工程師需要在系統輸入一個數值來完成這個知識點【{n}】的考驗。經過一連串的運算，我們得知主要的關鍵數值為 {v1} 和 {v2}。經過該節點邏輯推導後，你認為最符合常理的綜合結果應該是多少呢？"
-            correct_val = v1 + v2 * 2
-            options = [str(correct_val), str(correct_val + 10), str(correct_val - 20), str(correct_val + 30)]
-            random.shuffle(options)
-            add_q(n, "advanced", {"q": q_text, "options": options, "correct": options.index(str(correct_val)), "exp": "此為根據知識矩陣動態生成的進階情境，經過邏輯推導即可驗算正確。"})
-
+    # 只寫入具有確實解題邏輯的題目，移除泛用題以確保數學邏輯絕對正確
     # 將資料寫出為 extra_data.js
     with open('extra_data.js', 'w', encoding='utf-8') as f:
         f.write("const EXTRA_QUESTION_BANK = ")
