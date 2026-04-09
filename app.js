@@ -483,17 +483,26 @@ function handleOdsUpload(file) {
                 let nameStr = String(row[0] || "").trim();
                 if (!nameStr || nameStr === 'undefined' || nameStr === '') continue;
 
-                // 彈性解析 ID 和姓名
+                // 彈性解析 ID (年級 + 座號2碼格式，例如 502) 和姓名
                 let id = String(fallbackId);
                 let name = nameStr;
-                const match = nameStr.match(/(\d+)號/);
-                if (match) {
-                    id = match[1];
-                    // 去除 "x號" 或 "x號 " 等前綴
+                
+                const matchGrade = nameStr.match(/(\d+)年/);
+                const matchNum = nameStr.match(/(\d+)號/);
+
+                if (matchNum) {
+                    let numStr = matchNum[1].padStart(2, '0');
+                    if (matchGrade) {
+                        id = matchGrade[1] + numStr; // 例如 "5" + "02" = "502"
+                    } else {
+                        id = numStr; // 若無年級則至少保留兩碼 "02"
+                    }
+                    // 去除 "x號" 等前綴保留姓名
                     name = nameStr.replace(/.*?(\d+)號\s*/, '').trim(); 
                 } else if (nameStr.match(/^\d+/)) {
-                     // 若開頭是純數字例如 "5林小明"
-                     id = nameStr.match(/^(\d+)/)[1];
+                     // 若開頭是純數字例如 "5 林小明" 但沒寫「號」字
+                     let numRaw = nameStr.match(/^(\d+)/)[1];
+                     id = matchGrade ? matchGrade[1] + numRaw.padStart(2, '0') : numRaw.padStart(2, '0');
                      name = nameStr.replace(/^\d+\s*/, '').trim();
                 } else {
                     fallbackId++;
@@ -520,10 +529,15 @@ function handleOdsUpload(file) {
             customMapping = newMapping;
             localStorage.setItem('custom_student_mapping', JSON.stringify(newMapping));
 
-            // 同步至雲端
-            DatabaseService.syncStudents(newMapping);
+            status.textContent = "🔄 正在清理舊資料並同步新名單...";
+            
+            // 清空雲端的舊有資料 (包含所有舊名單、進度、日誌)
+            await DatabaseService.clearAllDataForNewUpload();
 
-            status.textContent = "✅ 名單更新成功！可在後台查看最新資料。";
+            // 同步新名單至雲端
+            await DatabaseService.syncStudents(newMapping);
+
+            status.textContent = "✅ 名單更新成功！(舊進度已清除)";
             status.classList.add('success');
             renderTeacherDashboard();
         } catch (err) {
@@ -546,15 +560,24 @@ async function renderProgressOverview() {
     tbody.innerHTML = '<tr><td colspan="6" style="text-align:center">載入數據中...</td></tr>';
 
     // 1. 獲取所有「雲端學生名單」與「雲端進度」
-    const [cloudStudents, allCloudProgress] = await Promise.all([
-        DatabaseService.getAllStudents(),
-        DatabaseService.getAllProgress()
+    let [cloudStudents, allCloudProgress] = await Promise.all([
+        DatabaseService.getAllStudents().catch(() => []),
+        DatabaseService.getAllProgress().catch(() => [])
     ]);
+
+    // 降級防護：如果雲端因連線或設定問題抓不到名單，但本地已有上傳解析過的 customMapping，就作爲備援顯示
+    if ((!cloudStudents || cloudStudents.length === 0) && Object.keys(customMapping).length > 0) {
+        cloudStudents = Object.keys(customMapping).map(id => ({
+            id: id,
+            name: customMapping[id].name,
+            weak_nodes: customMapping[id].weakNodes
+        }));
+    }
 
     tbody.innerHTML = '';
 
     if (!cloudStudents || cloudStudents.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center">目前雲端沒有學生名單，請上傳 ODS 建立資料。</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color: #ff4d4f;">尚無學生名單資料。請先上傳 ODS 檔案或檢查雲端連線狀況。</td></tr>';
         return;
     }
 
@@ -565,8 +588,8 @@ async function renderProgressOverview() {
         const studentWeakNodes = [...new Set(student.weak_nodes || [])];
         const totalPossible = studentWeakNodes.length;
 
-        // 篩選該學生的進度
-        const pList = allCloudProgress.filter(p => p.student_id === student.id);
+        // 篩選該學生的進度，強制轉為字串比對避免雷同的 id 型別錯誤
+        const pList = allCloudProgress.filter(p => String(p.student_id) === String(student.id));
         const progress = pList.reduce((acc, cur) => {
             acc[`${cur.node_code}_${cur.level}`] = cur.is_completed;
             return acc;

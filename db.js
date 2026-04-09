@@ -163,6 +163,15 @@ const DatabaseService = {
             .neq('student_id', ''); // 刪除所有
         
         if (error) console.error('清空紀錄失敗:', error);
+    },
+
+    // 上傳新檔案時清空舊有所有的資料 (名單、進度、日誌)
+    async clearAllDataForNewUpload() {
+        if (!supabaseClient) return;
+        console.log("Cleaning old database records...");
+        await supabaseClient.from('practice_progress').delete().neq('student_id', '');
+        await supabaseClient.from('quiz_logs').delete().neq('student_id', '');
+        await supabaseClient.from('students').delete().neq('id', '');
     }
 };
 
