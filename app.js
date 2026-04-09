@@ -242,25 +242,30 @@ window.startPractice = function (nodeCode) {
     if (nodeCode) nodeCode = String(nodeCode).toUpperCase();
     currentNode = nodeCode;
     
-    // 【動態防呆】若點擊的節點在系統預設題庫中不存在，即時產生預設佔位題讓系統不報錯
+    // 初始化題庫結構
     if (!QUESTION_BANK[nodeCode]) {
         QUESTION_BANK[nodeCode] = { beginner: [], intermediate: [], advanced: [] };
-        const nodeLabel = (typeof NODES_DESCRIPTIONS !== 'undefined' && NODES_DESCRIPTIONS[nodeCode]) ? NODES_DESCRIPTIONS[nodeCode] : nodeCode;
-        
-        ['beginner', 'intermediate', 'advanced'].forEach(lvl => {
+    }
+
+    const nodeLabel = (typeof NODES_DESCRIPTIONS !== 'undefined' && NODES_DESCRIPTIONS[nodeCode]) ? NODES_DESCRIPTIONS[nodeCode] : nodeCode;
+
+    // 【動態防呆】檢查所有難度，如果該難度的陣列為空（可能是因為沒題目或被過濾器刪光），強制重新產生佔位題
+    ['beginner', 'intermediate', 'advanced'].forEach(lvl => {
+         if (!QUESTION_BANK[nodeCode][lvl] || QUESTION_BANK[nodeCode][lvl].length === 0) {
+             QUESTION_BANK[nodeCode][lvl] = [];
              const lvlName = { 'beginner': '初級', 'intermediate': '中級', 'advanced': '高級' }[lvl];
              for(let k=1; k<=5; k++) {
                  QUESTION_BANK[nodeCode][lvl].push({
-                     q: `【動態補上題庫】針對「${nodeLabel}」尚未配置真實題目。此為系統臨時產出的防呆替換題（${lvlName} 第 ${k} 題）。\n\n如需正式學習內容，請利用 AI 工具產出對應 Python 腳本更新。\n\n請問 1+1 等於多少？`,
+                     q: `【動態補上題庫】針對「${nodeLabel}」目前尚無真實題目。此為系統自動產出的防呆替換題（${lvlName} 第 ${k} 題）。\n\n如需正式學習內容，請利用 AI 工具產出對應 Python 腳本更新。\n\n請問 1+1 等於多少？`,
                      options: ['2', '3', '4', '5'],
                      correct: 0,
-                     exp: '此題目為臨時佔位用。如果老師上傳了原本系統不認識的新知識點（新名稱），就會顯示此防呆題目。'
+                     exp: '此題目為臨時佔位用。'
                  });
              }
-        });
-    }
+         }
+    });
 
-    let levelQuestions = (QUESTION_BANK[nodeCode] && QUESTION_BANK[nodeCode][currentLevel]) ? QUESTION_BANK[nodeCode][currentLevel] : [];
+    let levelQuestions = QUESTION_BANK[nodeCode][currentLevel];
 
     // 重新更新題目：隨機排序
     levelQuestions = [...levelQuestions].sort(() => 0.5 - Math.random());
