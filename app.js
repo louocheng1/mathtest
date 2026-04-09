@@ -241,6 +241,25 @@ function renderNodes() {
 window.startPractice = function (nodeCode) {
     if (nodeCode) nodeCode = String(nodeCode).toUpperCase();
     currentNode = nodeCode;
+    
+    // 【動態防呆】若點擊的節點在系統預設題庫中不存在，即時產生預設佔位題讓系統不報錯
+    if (!QUESTION_BANK[nodeCode]) {
+        QUESTION_BANK[nodeCode] = { beginner: [], intermediate: [], advanced: [] };
+        const nodeLabel = (typeof NODES_DESCRIPTIONS !== 'undefined' && NODES_DESCRIPTIONS[nodeCode]) ? NODES_DESCRIPTIONS[nodeCode] : nodeCode;
+        
+        ['beginner', 'intermediate', 'advanced'].forEach(lvl => {
+             const lvlName = { 'beginner': '初級', 'intermediate': '中級', 'advanced': '高級' }[lvl];
+             for(let k=1; k<=5; k++) {
+                 QUESTION_BANK[nodeCode][lvl].push({
+                     q: `【動態補上題庫】針對「${nodeLabel}」尚未配置真實題目。此為系統臨時產出的防呆替換題（${lvlName} 第 ${k} 題）。\n\n如需正式學習內容，請利用 AI 工具產出對應 Python 腳本更新。\n\n請問 1+1 等於多少？`,
+                     options: ['2', '3', '4', '5'],
+                     correct: 0,
+                     exp: '此題目為臨時佔位用。如果老師上傳了原本系統不認識的新知識點（新名稱），就會顯示此防呆題目。'
+                 });
+             }
+        });
+    }
+
     let levelQuestions = (QUESTION_BANK[nodeCode] && QUESTION_BANK[nodeCode][currentLevel]) ? QUESTION_BANK[nodeCode][currentLevel] : [];
 
     // 重新更新題目：隨機排序
@@ -415,44 +434,73 @@ function handleOdsUpload(file) {
             const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
             const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
 
-            // 解析邏輯 (兼容新版 ODS MultiIndex 格式)
+            // 解析邏輯 (更具彈性的新版 ODS MultiIndex 格式)
             const newMapping = {};
             
-            const headerRow0 = jsonData[0] || []; // 第一列：包含長節點名稱與代碼
-            const headerRow2 = jsonData[2] || []; // 第三列：包含 '答對率', '次數'
+            // 找出包含標題的列 (前 3 列)
+            const headerRow0 = jsonData[0] || []; 
+            const headerRow2 = jsonData[2] || []; 
             
             const rateColIndices = [];
             const colToNodeCode = {};
             
-            let currentNodeCode = "";
-            for (let j = 0; j < headerRow2.length; j++) {
-                // 因合併儲存格，節點代碼可能只在開頭出現
-                if (headerRow0[j] && String(headerRow0[j]).includes('-')) {
-                    currentNodeCode = String(headerRow0[j]).split(' ')[0].toUpperCase();
+            // 掃描第三列，找出所有的 "答對率"
+            // 並對應到第一列的最新一個有效（非空白、非 "學生"）字串作為 NodeCode
+            let currentNodeCode = "未命名節點";
+            for (let j = 0; j < Math.max(headerRow0.length, headerRow2.length); j++) {
+                const cell0 = String(headerRow0[j] || "").trim();
+                
+                // 如果該欄上方有新的節點名稱，就更新 currentNodeCode
+                if (cell0 !== "" && cell0 !== "undefined" && cell0 !== "學生" && cell0 !== "完成率") {
+                    currentNodeCode = cell0.split(' ')[0].toUpperCase(); // 嘗試取第一個詞作為代碼，或整個保留
+                    
+                    // 動態將此節點名稱紀錄起來，供前端卡片顯示使用
+                    const desc = cell0.split(' ').slice(1).join(' ').trim() || currentNodeCode;
+                    if (typeof window.NODES_DESCRIPTIONS !== 'undefined') {
+                         window.NODES_DESCRIPTIONS[currentNodeCode] = desc;
+                    }
                 }
                 
-                if (String(headerRow2[j]).includes('答對率') && currentNodeCode) {
+                const cell2 = String(headerRow2[j] || "").trim();
+                if (cell2.includes('答對率')) {
                     rateColIndices.push(j);
                     colToNodeCode[j] = currentNodeCode;
                 }
             }
 
+            // 從第 4 列開始讀取學生資料
+            let fallbackId = 1;
             for (let i = 3; i < jsonData.length; i++) {
                 const row = jsonData[i];
                 if (!row || row.length === 0) continue;
 
-                const nameStr = String(row[0]); // 姓名位於第一欄
-                if (!nameStr || nameStr === 'undefined' || !nameStr.includes('號')) continue;
+                // 姓名位於第一欄
+                let nameStr = String(row[0] || "").trim();
+                if (!nameStr || nameStr === 'undefined' || nameStr === '') continue;
 
+                // 彈性解析 ID 和姓名
+                let id = String(fallbackId);
+                let name = nameStr;
                 const match = nameStr.match(/(\d+)號/);
-                const id = match ? match[1] : `ID_${i}`;
-                const name = nameStr.split('號').pop().trim();
+                if (match) {
+                    id = match[1];
+                    // 去除 "x號" 或 "x號 " 等前綴
+                    name = nameStr.replace(/.*?(\d+)號\s*/, '').trim(); 
+                } else if (nameStr.match(/^\d+/)) {
+                     // 若開頭是純數字例如 "5林小明"
+                     id = nameStr.match(/^(\d+)/)[1];
+                     name = nameStr.replace(/^\d+\s*/, '').trim();
+                } else {
+                    fallbackId++;
+                }
+                
+                if (name === "") name = nameStr; // 如果切完變空的，保留原狀
 
                 const weakNodes = [];
                 for (let colIdx of rateColIndices) {
                     const cellValue = row[colIdx];
-                    // 根據檔案設計，答對率為 0 或空值即為弱點
-                    if (cellValue === 0) {
+                    // 若答對率為 0 或字串 '0' 即為弱點 (或為 NaN, null 依據 Excel 空白處理)
+                    if (cellValue === 0 || cellValue === '0') {
                         weakNodes.push(colToNodeCode[colIdx]);
                     }
                 }
