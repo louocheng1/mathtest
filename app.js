@@ -415,35 +415,52 @@ function handleOdsUpload(file) {
             const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
             const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
 
-            // 解析邏輯 (兼容 sync_to_web.py 格式)
-            // 尋找答對率為 0 的節點
+            // 解析邏輯 (兼容新版 ODS MultiIndex 格式)
             const newMapping = {};
-            const headers = jsonData[2]; // 假設標題在第三列
+            
+            const headerRow0 = jsonData[0] || []; // 第一列：包含長節點名稱與代碼
+            const headerRow2 = jsonData[2] || []; // 第三列：包含 '答對率', '次數'
+            
+            const rateColIndices = [];
+            const colToNodeCode = {};
+            
+            let currentNodeCode = "";
+            for (let j = 0; j < headerRow2.length; j++) {
+                // 因合併儲存格，節點代碼可能只在開頭出現
+                if (headerRow0[j] && String(headerRow0[j]).includes('-')) {
+                    currentNodeCode = String(headerRow0[j]).split(' ')[0].toUpperCase();
+                }
+                
+                if (String(headerRow2[j]).includes('答對率') && currentNodeCode) {
+                    rateColIndices.push(j);
+                    colToNodeCode[j] = currentNodeCode;
+                }
+            }
 
             for (let i = 3; i < jsonData.length; i++) {
                 const row = jsonData[i];
                 if (!row || row.length === 0) continue;
 
-                const nameStr = String(row[2]); // 姓名通常在第三欄
+                const nameStr = String(row[0]); // 姓名位於第一欄
+                if (!nameStr || nameStr === 'undefined' || !nameStr.includes('號')) continue;
+
                 const match = nameStr.match(/(\d+)號/);
                 const id = match ? match[1] : `ID_${i}`;
                 const name = nameStr.split('號').pop().trim();
 
                 const weakNodes = [];
-                for (let j = 3; j < row.length; j++) {
-                    const cellValue = row[j];
+                for (let colIdx of rateColIndices) {
+                    const cellValue = row[colIdx];
+                    // 根據檔案設計，答對率為 0 或空值即為弱點
                     if (cellValue === 0) {
-                        let nodeCode = headers[j].split(' ')[0];
-                        if (nodeCode && nodeCode.includes('-')) {
-                            weakNodes.push(String(nodeCode).toUpperCase());
-                        }
+                        weakNodes.push(colToNodeCode[colIdx]);
                     }
                 }
 
                 newMapping[id] = {
                     name: name,
                     fullName: nameStr,
-                    weakNodes: weakNodes
+                    weakNodes: [...new Set(weakNodes)] // 去除重複
                 };
             }
 
