@@ -566,7 +566,7 @@ async function renderProgressOverview() {
     ]);
 
     // 降級防護：如果雲端因連線或設定問題抓不到名單，但本地已有上傳解析過的 customMapping，就作爲備援顯示
-    if ((!cloudStudents || cloudStudents.length === 0) && Object.keys(customMapping).length > 0) {
+    if ((!cloudStudents || cloudStudents.length === 0) && customMapping && Object.keys(customMapping).length > 0) {
         cloudStudents = Object.keys(customMapping).map(id => ({
             id: id,
             name: customMapping[id].name,

@@ -1,5 +1,5 @@
 const STUDENT_MAPPING = {
-  "2": {
+  "502": {
     "name": "李聖傑",
     "fullName": "5年 1班 2號 李聖傑",
     "weakNodes": [
@@ -69,7 +69,7 @@ const STUDENT_MAPPING = {
       "S-5-7-S05"
     ]
   },
-  "3": {
+  "503": {
     "name": "趙云",
     "fullName": "5年 1班 3號 趙云",
     "weakNodes": [
@@ -139,7 +139,7 @@ const STUDENT_MAPPING = {
       "S-5-7-S05"
     ]
   },
-  "4": {
+  "504": {
     "name": "江以約",
     "fullName": "5年 1班 4號 江以約",
     "weakNodes": [
@@ -201,7 +201,7 @@ const STUDENT_MAPPING = {
       "S-5-6-S05"
     ]
   },
-  "5": {
+  "505": {
     "name": "許榮恩",
     "fullName": "5年 1班 5號 許榮恩",
     "weakNodes": [
@@ -272,7 +272,7 @@ const STUDENT_MAPPING = {
       "S-5-7-S05"
     ]
   },
-  "6": {
+  "506": {
     "name": "趙梓翔",
     "fullName": "5年 1班 6號 趙梓翔",
     "weakNodes": [
@@ -337,7 +337,7 @@ const STUDENT_MAPPING = {
       "S-5-7-S05"
     ]
   },
-  "9": {
+  "509": {
     "name": "陳威帆",
     "fullName": "5年 1班 9號 陳威帆",
     "weakNodes": [
